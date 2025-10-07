@@ -1,8 +1,8 @@
-{{- $mainConfig := "" -}}
-{{- with .Values.connectors.mainConfig }}
-  {{- $mainConfig = . -}}
-{{- else if .Values.connectors.mainConfigFile }}
-  {{- $mainConfig = .Files.Get .Values.connectors.mainConfigFile -}}
+{{- $mainConfig := .Values.connectors.mainConfig | default "" -}}
+{{- if not $mainConfig }}
+  {{- if .Values.connectors.mainConfigFile }}
+    {{- $mainConfig = .Files.Get .Values.connectors.mainConfigFile -}}
+  {{- end }}
 {{- end }}
 {{- if $mainConfig }}
 apiVersion: v1
@@ -17,8 +17,8 @@ data:
 {{- end }}
 
 {{- $backupConfig := "" -}}
-{{- with .Values.connectors.backupConfig }}
-  {{- $backupConfig = . -}}
+{{- if (hasKey .Values.connectors "backupConfig") }}
+  {{- $backupConfig = .Values.connectors.backupConfig | default "" -}}
 {{- else if .Values.connectors.backupConfigFile }}
   {{- $backupConfig = .Files.Get .Values.connectors.backupConfigFile -}}
 {{- end }}

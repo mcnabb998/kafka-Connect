@@ -17,6 +17,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
+{{- define "kafka-connect.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "kafka-connect.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
 {{- define "kafka-connect.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create -}}
 {{- default (include "kafka-connect.fullname" .) .Values.serviceAccount.name -}}
