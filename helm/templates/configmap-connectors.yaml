@@ -1,0 +1,36 @@
+{{- $mainConfig := "" -}}
+{{- with .Values.connectors.mainConfig }}
+  {{- $mainConfig = . -}}
+{{- else if .Values.connectors.mainConfigFile }}
+  {{- $mainConfig = .Files.Get .Values.connectors.mainConfigFile -}}
+{{- end }}
+{{- if $mainConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kafka-connect.fullname" . }}-connectors
+  labels:
+    {{- include "kafka-connect.labels" . | nindent 4 }}
+data:
+  connectors.yaml: |
+{{ $mainConfig | indent 4 }}
+{{- end }}
+
+{{- $backupConfig := "" -}}
+{{- with .Values.connectors.backupConfig }}
+  {{- $backupConfig = . -}}
+{{- else if .Values.connectors.backupConfigFile }}
+  {{- $backupConfig = .Files.Get .Values.connectors.backupConfigFile -}}
+{{- end }}
+{{- if $backupConfig }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kafka-connect.fullname" . }}-backup
+  labels:
+    {{- include "kafka-connect.labels" . | nindent 4 }}
+data:
+  bkup_config.json: |
+{{ $backupConfig | indent 4 }}
+{{- end }}
