@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_HOME="${APP_HOME:-/opt/kafka-connect}"
+CONNECT_CONFIG_FILE="${CONNECT_CONFIG_FILE:-${APP_HOME}/config/connect-distributed.properties}"
+CONNECT_BIN="${CONNECT_BIN:-/opt/kafka/bin/connect-distributed.sh}"
+
+# shellcheck source=run-env.sh
+source "${APP_HOME}/bin/run-env.sh"
+
+load_env_file "${CONNECT_ENVIRONMENT:-}"
+
+generate_keytab
+configure_jaas
+wait_for_connect_rest "${CONNECT_REST_URL:-}"
+
+if [[ ! -x "$CONNECT_BIN" ]]; then
+  echo "[ERROR] Kafka Connect launcher $CONNECT_BIN not found or not executable" >&2
+  exit 1
+fi
+
+if [[ ! -f "$CONNECT_CONFIG_FILE" ]]; then
+  echo "[WARN] Connect configuration $CONNECT_CONFIG_FILE not found; using command arguments"
+  exec "$CONNECT_BIN" "$@"
+else
+  exec "$CONNECT_BIN" "$CONNECT_CONFIG_FILE"
+fi

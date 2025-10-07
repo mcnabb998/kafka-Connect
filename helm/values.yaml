@@ -1,0 +1,40 @@
+image:
+  repository: example/kafka-connect
+  tag: latest
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+
+deployment:
+  replicas: 1
+  resources: {}
+  heap:
+    initial: 512m
+    max: 1024m
+  sidecars: []
+
+connectors:
+  mainConfigFile: connectors/connectors.yaml
+  backupConfigFile: connectors/bkup_config.json
+
+reconcileJob:
+  enabled: true
+  schedule: ""
+  image:
+    repository: python
+    tag: 3.11-slim
+    pullPolicy: IfNotPresent
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  env: []
+  sidecars: []
+  resources: {}
+  heap:
+    initial: 256m
+    max: 512m
+
+service:
+  type: ClusterIP
+  port: 8083

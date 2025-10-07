@@ -1,0 +1,34 @@
+deployment:
+  replicas: 4
+  heap:
+    initial: 1024m
+    max: 2048m
+  resources:
+    requests:
+      cpu: 1
+      memory: 3Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  sidecars:
+    - name: log-shipper
+      image: fluent/fluent-bit:2.2.2
+      env:
+        - name: OUTPUT_HOST
+          value: logsink
+        - name: OUTPUT_PORT
+          value: "24224"
+      volumeMounts:
+        - name: logs
+          mountPath: /var/log/connect
+
+reconcileJob:
+  heap:
+    initial: 512m
+    max: 1024m
+  backoffLimit: 5
+  env:
+    - name: CONNECT_ENVIRONMENT
+      value: prod
+    - name: CONNECT_REST_URL
+      value: http://kafka-connect-prod:8083

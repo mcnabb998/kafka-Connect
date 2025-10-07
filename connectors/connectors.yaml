@@ -1,0 +1,48 @@
+{
+  "connectors": [
+    {
+      "name": "sample-s3-sink",
+      "config": {
+        "connector.class": "io.confluent.connect.s3.S3SinkConnector",
+        "tasks.max": 3,
+        "topics": "demo-topic",
+        "consumer.override.ssl.endpoint.identification.algorithm": "",
+        "consumer.override.sasl.mechanism": "GSSAPI",
+        "consumer.override.sasl.kerberos.service.name": "kafka",
+        "consumer.override.security.protocol": "SASL_SSL",
+        "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+        "value.converter": "io.confluent.connect.avro.AvroConverter",
+        "value.converter.schema.registry.url": "http://schema-registry:8081",
+        "value.converter.basic.auth.credentials.source": "USER_INFO",
+        "value.converter.basic.auth.user.info": "+:password",
+        "flush.size": 1000,
+        "rotate.interval.ms": 600000,
+        "errors.tolerance": "all",
+        "errors.deadletterqueue.topic.name": "dlq-demo-topic",
+        "schema.registry.url": "http://schema-registry:8081",
+        "config.providers": "file",
+        "config.providers.file.class": "org.apache.kafka.common.config.provider.FileConfigProvider"
+      }
+    },
+    {
+      "name": "sample-jdbc-source",
+      "config": {
+        "connector.class": "io.confluent.connect.jdbc.JdbcSourceConnector",
+        "tasks.max": 1,
+        "poll.interval.ms": 60000,
+        "connection.url": "jdbc:postgresql://postgres:5432/example",
+        "connection.user": "connect",
+        "connection.password": "changeme",
+        "mode": "timestamp",
+        "timestamp.column.name": "updated_at",
+        "table.whitelist": "customers",
+        "topic.prefix": "jdbc-",
+        "consumer.override.auto.offset.reset": "earliest",
+        "value.converter": "io.confluent.connect.json.JsonSchemaConverter",
+        "value.converter.schema.registry.url": "http://schema-registry:8081",
+        "errors.tolerance": "all",
+        "schema.registry.url": "http://schema-registry:8081"
+      }
+    }
+  ]
+}

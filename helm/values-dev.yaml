@@ -1,0 +1,20 @@
+deployment:
+  replicas: 1
+  heap:
+    initial: 384m
+    max: 768m
+  resources:
+    requests:
+      cpu: 200m
+      memory: 768Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+reconcileJob:
+  heap:
+    initial: 256m
+    max: 384m
+  env:
+    - name: CONNECT_REST_URL
+      value: http://kafka-connect-dev:8083
