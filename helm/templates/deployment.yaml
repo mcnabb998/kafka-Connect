@@ -1,0 +1,92 @@
+{{- if gt (.Values.replicaCount | int) 0 }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kafka-connect.fullname" . }}
+  labels:
+    {{- include "kafka-connect.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "kafka-connect.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "kafka-connect.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "kafka-connect.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: CONNECT_BOOTSTRAP_SERVERS
+              value: {{ .Values.kafka.bootstrapServers | quote }}
+            - name: CONNECT_REST_ADVERTISED_HOST_NAME
+              value: {{ include "kafka-connect.fullname" . }}
+            - name: CONNECT_REST_PORT
+              value: {{ .Values.service.port | quote }}
+            - name: CONNECT_GROUP_ID
+              value: {{ .Values.connect.groupId | quote }}
+            - name: CONNECT_CONFIG_STORAGE_TOPIC
+              value: {{ .Values.connect.configStorageTopic | quote }}
+            - name: CONNECT_OFFSET_STORAGE_TOPIC
+              value: {{ .Values.connect.offsetStorageTopic | quote }}
+            - name: CONNECT_STATUS_STORAGE_TOPIC
+              value: {{ .Values.connect.statusStorageTopic | quote }}
+            - name: CONNECT_KEY_CONVERTER
+              value: {{ .Values.connect.keyConverter | quote }}
+            - name: CONNECT_VALUE_CONVERTER
+              value: {{ .Values.connect.valueConverter | quote }}
+            - name: CONNECT_PLUGIN_PATH
+              value: {{ .Values.connect.pluginPath | quote }}
+            {{- if .Values.connect.extraEnv }}
+            {{- toYaml .Values.connect.extraEnv | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
