@@ -42,84 +42,84 @@ spec:
             - |
               set -euo pipefail
               python - <<'PY'
-import json
-import os
-import pathlib
-import time
-import urllib.error
-import urllib.request
+              import json
+              import os
+              import pathlib
+              import time
+              import urllib.error
+              import urllib.request
 
-CONNECT_URL = os.environ.get("CONNECT_REST_URL", "http://localhost:8083")
-HEADERS = {"Content-Type": "application/json"}
-
-
-def send_json(path: str, payload: dict, method: str = "POST") -> None:
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(path, data=data, headers=HEADERS, method=method)
-    with urllib.request.urlopen(req) as resp:  # noqa: S310 (internal network)
-        resp.read()
-
-def upsert_connector(connector: dict) -> None:
-    name = connector.get("name")
-    if not name:
-        raise ValueError("Connector definition missing 'name'")
-    config = connector.get("config") or {}
-    payload = {"name": name, "config": config}
-    put_path = f"{CONNECT_URL}/connectors/{name}/config"
-    try:
-        send_json(put_path, config, method="PUT")
-        print(f"Updated connector {name}")
-    except urllib.error.HTTPError as err:
-        if err.code == 404:
-            create_path = f"{CONNECT_URL}/connectors"
-            send_json(create_path, payload, method="POST")
-            print(f"Created connector {name}")
-        else:
-            raise
+              CONNECT_URL = os.environ.get("CONNECT_REST_URL", "http://localhost:8083")
+              HEADERS = {"Content-Type": "application/json"}
 
 
-def load_connector_documents(base_path: pathlib.Path):
-    for file_path in sorted(base_path.iterdir()):
-        if not file_path.is_file():
-            continue
-        text = file_path.read_text(encoding="utf-8")
-        if not text.strip():
-            continue
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError as exc:  # noqa: F841
-            print(f"Skipping {file_path}: not valid JSON", flush=True)
-            continue
-        if isinstance(data, dict) and "connectors" in data:
-            for connector in data.get("connectors", []):
-                yield connector
-        else:
-            yield data
+              def send_json(path: str, payload: dict, method: str = "POST") -> None:
+                  data = json.dumps(payload).encode("utf-8")
+                  req = urllib.request.Request(path, data=data, headers=HEADERS, method=method)
+                  with urllib.request.urlopen(req) as resp:  # noqa: S310 (internal network)
+                      resp.read()
+
+              def upsert_connector(connector: dict) -> None:
+                  name = connector.get("name")
+                  if not name:
+                      raise ValueError("Connector definition missing 'name'")
+                  config = connector.get("config") or {}
+                  payload = {"name": name, "config": config}
+                  put_path = f"{CONNECT_URL}/connectors/{name}/config"
+                  try:
+                      send_json(put_path, config, method="PUT")
+                      print(f"Updated connector {name}")
+                  except urllib.error.HTTPError as err:
+                      if err.code == 404:
+                          create_path = f"{CONNECT_URL}/connectors"
+                          send_json(create_path, payload, method="POST")
+                          print(f"Created connector {name}")
+                      else:
+                          raise
 
 
-def wait_for_rest(timeout: int = int(os.environ.get("CONNECT_REST_TIMEOUT_SECONDS", "120")), interval: int = int(os.environ.get("CONNECT_REST_POLL_INTERVAL_SECONDS", "5"))):
-    deadline = time.time() + timeout
-    status_path = f"{CONNECT_URL}/connectors"
-    while time.time() < deadline:
-        try:
-            with urllib.request.urlopen(status_path) as resp:  # noqa: S310
-                resp.read()
-                return
-        except Exception:  # noqa: BLE001
-            time.sleep(interval)
-    raise RuntimeError(f"Kafka Connect REST API at {CONNECT_URL} not reachable within timeout")
+              def load_connector_documents(base_path: pathlib.Path):
+                  for file_path in sorted(base_path.iterdir()):
+                      if not file_path.is_file():
+                          continue
+                      text = file_path.read_text(encoding="utf-8")
+                      if not text.strip():
+                          continue
+                      try:
+                          data = json.loads(text)
+                      except json.JSONDecodeError as exc:  # noqa: F841
+                          print(f"Skipping {file_path}: not valid JSON", flush=True)
+                          continue
+                      if isinstance(data, dict) and "connectors" in data:
+                          for connector in data.get("connectors", []):
+                              yield connector
+                      else:
+                          yield data
 
 
-def main():
-    wait_for_rest()
-    config_dir = pathlib.Path("/config/connectors")
-    for connector in load_connector_documents(config_dir):
-        upsert_connector(connector)
+              def wait_for_rest(timeout: int = int(os.environ.get("CONNECT_REST_TIMEOUT_SECONDS", "120")), interval: int = int(os.environ.get("CONNECT_REST_POLL_INTERVAL_SECONDS", "5"))):
+                  deadline = time.time() + timeout
+                  status_path = f"{CONNECT_URL}/connectors"
+                  while time.time() < deadline:
+                      try:
+                          with urllib.request.urlopen(status_path) as resp:  # noqa: S310
+                              resp.read()
+                              return
+                      except Exception:  # noqa: BLE001
+                          time.sleep(interval)
+                  raise RuntimeError(f"Kafka Connect REST API at {CONNECT_URL} not reachable within timeout")
 
 
-if __name__ == "__main__":
-    main()
-PY
+              def main():
+                  wait_for_rest()
+                  config_dir = pathlib.Path("/config/connectors")
+                  for connector in load_connector_documents(config_dir):
+                      upsert_connector(connector)
+
+
+              if __name__ == "__main__":
+                  main()
+              PY
           {{- with .Values.reconcileJob.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
