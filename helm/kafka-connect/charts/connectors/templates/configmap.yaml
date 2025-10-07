@@ -8,9 +8,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "kafka-connect.fullname" . }}-connectors
+  name: {{ include "connectors.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "kafka-connect.labels" . | nindent 4 }}
+    {{- include "connectors.labels" . | nindent 4 }}
 data:
   connectors.yaml: |
 {{ $mainConfig | indent 4 }}
@@ -27,9 +28,10 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "kafka-connect.fullname" . }}-backup
+  name: {{ include "connectors.fullname" . }}-backup
+  namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "kafka-connect.labels" . | nindent 4 }}
+    {{- include "connectors.labels" . | nindent 4 }}
 data:
   bkup_config.json: |
 {{ $backupConfig | indent 4 }}

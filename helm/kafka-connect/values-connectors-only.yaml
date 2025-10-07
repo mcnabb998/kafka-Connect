@@ -1,0 +1,40 @@
+# Connectors-only deployment (for standalone connector management)
+global:
+  connect:
+    restUrl: "http://host.docker.internal:8083"
+    timeout: 300
+    pollInterval: 5
+
+# Disable the main Kafka Connect deployment
+replicaCount: 0
+
+# Enable only connectors subchart
+connectors:
+  enabled: true
+  reconcile:
+    enabled: true
+    prune: false
+  legacy:
+    reconcileEnabled: false
+  reconcileJob:
+    heap:
+      initial: 128m
+      max: 256m
+    env: []  # Remove duplicate CONNECT_REST_URL
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
+  connectors:
+    mainConfig: |
+      connectors:
+        - name: standalone-s3-sink
+          config:
+            connector.class: io.confluent.connect.s3.S3SinkConnector
+            tasks.max: 1
+            topics: standalone-topic
+            value.converter.schema.registry.url: http://schema-registry:8081
+            schema.registry.url: http://schema-registry:8081

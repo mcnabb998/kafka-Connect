@@ -1,0 +1,89 @@
+# Global values shared across charts
+global:
+  connect:
+    restUrl: ""  # Will be computed from service name
+    namespace: ""  # Will use release namespace
+    timeout: 300
+    pollInterval: 5
+
+# Kafka Connect cluster configuration
+replicaCount: 1
+
+image:
+  repository: example/kafka-connect
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8083
+
+# Kafka Connect specific configuration
+kafka:
+  bootstrapServers: "kafka:9092"
+
+connect:
+  groupId: "connect-cluster"
+  configStorageTopic: "connect-configs"
+  offsetStorageTopic: "connect-offsets"
+  statusStorageTopic: "connect-status"
+  keyConverter: "org.apache.kafka.connect.storage.StringConverter"
+  valueConverter: "org.apache.kafka.connect.json.JsonConverter"
+  pluginPath: "/opt/kafka-connect/plugins"
+  extraEnv: []
+
+# Liveness and readiness probes
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+
+resources: {}
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+volumeMounts: []
+volumes: []
+
+# Connectors subchart configuration
+connectors:
+  enabled: true
+  # Values passed to connectors subchart

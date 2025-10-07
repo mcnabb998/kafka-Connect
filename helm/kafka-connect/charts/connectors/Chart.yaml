@@ -1,0 +1,5 @@
+apiVersion: v2
+name: connectors
+version: 0.1.0
+description: Kafka Connect connectors management subchart
+type: application

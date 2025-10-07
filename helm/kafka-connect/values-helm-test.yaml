@@ -1,0 +1,54 @@
+# Helm test values (for chart testing)
+global:
+  connect:
+    restUrl: "http://kafka-connect:8083"
+    timeout: 120
+    pollInterval: 3
+
+# Kafka Connect cluster configuration
+replicaCount: 1
+
+kafka:
+  bootstrapServers: "kafka:9092"
+
+# Minimal resources for testing
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: 200m
+    memory: 1Gi
+
+# Connectors subchart configuration
+connectors:
+  enabled: true
+  reconcile:
+    enabled: true
+    prune: false
+  legacy:
+    reconcileEnabled: false
+  reconcileJob:
+    backoffLimit: 1
+    ttlSecondsAfterFinished: 300
+    heap:
+      initial: 128m
+      max: 256m
+    env:
+      - name: CONNECT_REST_URL
+        value: "http://kafka-connect:8083"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
+  connectors:
+    mainConfig: |
+      connectors:
+        - name: test-mock-source
+          config:
+            connector.class: org.apache.kafka.connect.tools.MockSourceConnector
+            tasks.max: 1
+            topic: helm-test

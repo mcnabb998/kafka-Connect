@@ -1,0 +1,60 @@
+# Connectors subchart values
+reconcile:
+  enabled: true
+  prune: false
+  
+legacy:
+  reconcileEnabled: false
+
+# Job configuration for connector reconciliation
+reconcileJob:
+  enabled: true
+  schedule: ""  # Leave empty for one-time job, set for CronJob
+  image:
+    repository: python
+    tag: 3.11-slim
+    pullPolicy: IfNotPresent
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  restartPolicy: OnFailure
+  
+  # Resource configuration
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+      
+  heap:
+    initial: 128m
+    max: 256m
+    
+  # Java options for the reconcile process
+  javaOptsAppend: ""
+  
+  # Environment variables
+  env:
+    - name: CONNECT_REST_URL
+      value: ""  # Will be computed from parent chart
+    - name: CONNECT_REST_TIMEOUT_SECONDS
+      value: "300"
+    - name: CONNECT_REST_POLL_INTERVAL_SECONDS
+      value: "5"
+      
+  # Additional sidecars
+  sidecars: []
+
+# Connector configurations
+connectors:
+  # Main connector configuration (can be inline or from file)
+  mainConfig: ""
+  mainConfigFile: ""
+  
+  # Backup configuration
+  backupConfig: ""
+  backupConfigFile: ""
+  
+  # Environment-specific configurations
+  environment: "default"

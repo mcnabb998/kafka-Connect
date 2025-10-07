@@ -1,0 +1,55 @@
+# Production environment values
+global:
+  connect:
+    restUrl: "http://kafka-connect:8083"
+    timeout: 300
+    pollInterval: 5
+
+# Kafka Connect cluster configuration
+replicaCount: 3
+
+kafka:
+  bootstrapServers: "kafka:9092"
+
+deployment:
+  replicas: 3
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 1
+      memory: 4Gi
+
+# Enable autoscaling for production
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# Connectors subchart configuration
+connectors:
+  enabled: true
+  reconcile:
+    enabled: true
+    prune: true  # Enable pruning in production for clean state
+  legacy:
+    reconcileEnabled: false
+  reconcileJob:
+    heap:
+      initial: 256m
+      max: 512m
+    env:
+      - name: CONNECT_REST_URL
+        value: "http://kafka-connect:8083"
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+  connectors:
+    environment: "prod"
+    mainConfigFile: "environments/prod/connectors.yaml"

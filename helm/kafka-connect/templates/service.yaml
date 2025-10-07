@@ -3,6 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "kafka-connect.fullname" . }}
+  namespace: {{ include "kafka-connect.namespace" . }}
   labels:
     {{- include "kafka-connect.labels" . | nindent 4 }}
 spec:

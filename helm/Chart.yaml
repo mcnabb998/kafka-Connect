@@ -1,6 +1,0 @@
-apiVersion: v2
-name: kafka-connect
-version: 0.1.0
-description: Helm chart for deploying Kafka Connect with connector definitions and reconcile automation.
-type: application
-appVersion: "1.0.0"

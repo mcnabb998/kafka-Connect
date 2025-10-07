@@ -1,0 +1,38 @@
+# Test local environment values (for local testing)
+global:
+  connect:
+    restUrl: "http://kafka-connect-local-kafka-connect:8083"
+    timeout: 300
+    pollInterval: 5
+
+# Kafka Connect cluster configuration
+replicaCount: 1
+
+kafka:
+  bootstrapServers: "kafka-connect-local-kafka:9092"
+
+# Connectors subchart configuration  
+connectors:
+  enabled: true
+  reconcile:
+    enabled: true
+    prune: false
+  legacy:
+    reconcileEnabled: false
+  reconcileJob:
+    heap:
+      initial: 128m
+      max: 256m
+    env:
+      - name: CONNECT_REST_URL
+        value: "http://kafka-connect-local-kafka-connect:8083"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
+  connectors:
+    environment: "test"
+    mainConfigFile: "environments/test/connectors.yaml"

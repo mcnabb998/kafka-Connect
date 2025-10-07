@@ -24,10 +24,9 @@ RUN groupadd --system --gid ${APP_GID} ${APP_GROUP} \
     && useradd --system --home ${APP_HOME} --uid ${APP_UID} --gid ${APP_GID} \
         --shell /bin/bash ${APP_USER}
 
-RUN mkdir -p ${APP_HOME}/bin ${APP_HOME}/lib ${APP_HOME}/config ${APP_HOME}/connectors ${APP_HOME}/probes
+RUN mkdir -p ${APP_HOME}/bin ${APP_HOME}/lib ${APP_HOME}/config ${APP_HOME}/plugins ${APP_HOME}/probes
 
 COPY docker/artifacts/ ${APP_HOME}/lib/
-COPY connectors/ ${APP_HOME}/connectors/
 COPY --from=prep /workspace/scripts/ ${APP_HOME}/bin/
 COPY --from=prep /workspace/probes/ ${APP_HOME}/probes/
 

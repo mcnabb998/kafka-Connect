@@ -1,36 +1,53 @@
-{{- if .Values.reconcileJob.enabled }}
+{{- if and .Values.reconcile.enabled .Values.reconcileJob.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "kafka-connect.fullname" . }}-reconcile
+  name: {{ include "connectors.fullname" . }}-reconcile
+  namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "kafka-connect.labels" . | nindent 4 }}
+    {{- include "connectors.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   backoffLimit: {{ .Values.reconcileJob.backoffLimit | default 3 }}
   ttlSecondsAfterFinished: {{ .Values.reconcileJob.ttlSecondsAfterFinished | default 600 }}
   template:
     metadata:
       labels:
-        {{- include "kafka-connect.labels" . | nindent 8 }}
+        {{- include "connectors.labels" . | nindent 8 }}
+      annotations:
+        checksum/configmap: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
-      serviceAccountName: {{ include "kafka-connect.serviceAccountName" . }}
-      restartPolicy: OnFailure
+      serviceAccountName: {{ include "connectors.serviceAccountName" . }}
+      restartPolicy: {{ .Values.reconcileJob.restartPolicy | default "OnFailure" }}
       volumes:
         - name: connector-configs
           configMap:
-            name: {{ include "kafka-connect.fullname" . }}-connectors
+            name: {{ include "connectors.fullname" . }}
       containers:
         - name: reconcile
           image: "{{ .Values.reconcileJob.image.repository }}:{{ .Values.reconcileJob.image.tag }}"
           imagePullPolicy: {{ .Values.reconcileJob.image.pullPolicy }}
           env:
+            - name: CONNECT_REST_URL
+              value: {{ include "connectors.connectRestUrl" . | quote }}
+            - name: CONNECT_REST_TIMEOUT_SECONDS
+              value: {{ .Values.global.connect.timeout | default 300 | quote }}
+            - name: CONNECT_REST_POLL_INTERVAL_SECONDS
+              value: {{ .Values.global.connect.pollInterval | default 5 | quote }}
+            - name: RECONCILE_PRUNE_ENABLED
+              value: {{ .Values.reconcile.prune | quote }}
             - name: KAFKA_HEAP_OPTS
               value: "-Xms{{ .Values.reconcileJob.heap.initial }} -Xmx{{ .Values.reconcileJob.heap.max }}"
             - name: JAVA_OPTS_APPEND
               value: "{{ .Values.reconcileJob.javaOptsAppend | default "" }}"
             {{- range .Values.reconcileJob.env }}
+            {{- if .name }}
             - name: {{ .name }}
               value: {{ .value | quote }}
+            {{- end }}
             {{- end }}
           volumeMounts:
             - name: connector-configs
@@ -41,6 +58,10 @@ spec:
           args:
             - |
               set -euo pipefail
+              
+              # Install required Python packages
+              pip install --no-cache-dir requests
+              
               python - <<'PY'
               import json
               import os
@@ -48,15 +69,30 @@ spec:
               import time
               import urllib.error
               import urllib.request
+              import sys
 
               CONNECT_URL = os.environ.get("CONNECT_REST_URL", "http://localhost:8083")
+              PRUNE_ENABLED = os.environ.get("RECONCILE_PRUNE_ENABLED", "false").lower() == "true"
               HEADERS = {"Content-Type": "application/json"}
 
+              def log(message):
+                  print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}", flush=True)
 
               def send_json(path: str, payload: dict, method: str = "POST") -> None:
                   data = json.dumps(payload).encode("utf-8")
                   req = urllib.request.Request(path, data=data, headers=HEADERS, method=method)
-                  with urllib.request.urlopen(req) as resp:  # noqa: S310 (internal network)
+                  with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 (internal network)
+                      resp.read()
+
+              def get_json(path: str) -> dict:
+                  req = urllib.request.Request(path, headers={"Accept": "application/json"})
+                  with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
+                      return json.loads(resp.read().decode("utf-8"))
+
+              def delete_connector(name: str) -> None:
+                  delete_path = f"{CONNECT_URL}/connectors/{name}"
+                  req = urllib.request.Request(delete_path, method="DELETE")
+                  with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
                       resp.read()
 
               def upsert_connector(connector: dict) -> None:
@@ -68,15 +104,14 @@ spec:
                   put_path = f"{CONNECT_URL}/connectors/{name}/config"
                   try:
                       send_json(put_path, config, method="PUT")
-                      print(f"Updated connector {name}")
+                      log(f"Updated connector {name}")
                   except urllib.error.HTTPError as err:
                       if err.code == 404:
                           create_path = f"{CONNECT_URL}/connectors"
                           send_json(create_path, payload, method="POST")
-                          print(f"Created connector {name}")
+                          log(f"Created connector {name}")
                       else:
                           raise
-
 
               def load_connector_documents(base_path: pathlib.Path):
                   for file_path in sorted(base_path.iterdir()):
@@ -88,34 +123,74 @@ spec:
                       try:
                           data = json.loads(text)
                       except json.JSONDecodeError as exc:  # noqa: F841
-                          print(f"Skipping {file_path}: not valid JSON", flush=True)
-                          continue
+                          try:
+                              import yaml
+                              data = yaml.safe_load(text)
+                          except Exception:
+                              log(f"Skipping {file_path}: not valid JSON or YAML")
+                              continue
                       if isinstance(data, dict) and "connectors" in data:
                           for connector in data.get("connectors", []):
                               yield connector
                       else:
                           yield data
 
-
               def wait_for_rest(timeout: int = int(os.environ.get("CONNECT_REST_TIMEOUT_SECONDS", "120")), interval: int = int(os.environ.get("CONNECT_REST_POLL_INTERVAL_SECONDS", "5"))):
                   deadline = time.time() + timeout
                   status_path = f"{CONNECT_URL}/connectors"
                   while time.time() < deadline:
                       try:
-                          with urllib.request.urlopen(status_path) as resp:  # noqa: S310
+                          with urllib.request.urlopen(status_path, timeout=10) as resp:  # noqa: S310
                               resp.read()
                               return
-                      except Exception:  # noqa: BLE001
+                      except Exception as e:
+                          log(f"Waiting for Connect REST API... ({e})")
                           time.sleep(interval)
                   raise RuntimeError(f"Kafka Connect REST API at {CONNECT_URL} not reachable within timeout")
 
-
               def main():
+                  log(f"Starting connector reconciliation (PRUNE={PRUNE_ENABLED})")
                   wait_for_rest()
+                  
                   config_dir = pathlib.Path("/config/connectors")
+                  desired_connectors = {}
+                  
+                  # Load desired connectors
                   for connector in load_connector_documents(config_dir):
-                      upsert_connector(connector)
-
+                      name = connector.get("name")
+                      if name:
+                          desired_connectors[name] = connector
+                  
+                  log(f"Found {len(desired_connectors)} desired connectors")
+                  
+                  # Get existing connectors if pruning is enabled
+                  existing_connectors = set()
+                  if PRUNE_ENABLED:
+                      try:
+                          existing_connectors = set(get_json(f"{CONNECT_URL}/connectors"))
+                          log(f"Found {len(existing_connectors)} existing connectors")
+                      except Exception as e:
+                          log(f"Warning: Could not retrieve existing connectors: {e}")
+                  
+                  # Create/Update desired connectors
+                  for name, connector in desired_connectors.items():
+                      try:
+                          upsert_connector(connector)
+                      except Exception as e:
+                          log(f"Error processing connector {name}: {e}")
+                          sys.exit(1)
+                  
+                  # Delete unwanted connectors if pruning is enabled
+                  if PRUNE_ENABLED:
+                      to_delete = existing_connectors - set(desired_connectors.keys())
+                      for name in to_delete:
+                          try:
+                              delete_connector(name)
+                              log(f"Deleted connector {name}")
+                          except Exception as e:
+                              log(f"Warning: Could not delete connector {name}: {e}")
+                  
+                  log("Connector reconciliation completed successfully")
 
               if __name__ == "__main__":
                   main()
