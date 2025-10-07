@@ -1,0 +1,94 @@
+# Values for connector reconciliation only
+# This demonstrates deploying connectors via Helm to an existing Kafka Connect cluster
+
+# Disable the Kafka Connect deployment (use external one)
+replicaCount: 0
+
+# Service account is still needed for the job
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+# Reconciliation job configuration
+reconcileJob:
+  enabled: true
+  image:
+    repository: python
+    tag: "3.11-slim"
+    pullPolicy: IfNotPresent
+  heap:
+    initial: 256m
+    max: 384m
+  env:
+    - name: CONNECT_REST_URL
+      value: http://host.docker.internal:8083
+
+# Connector configurations from all your files
+connectors:
+  mainConfig: |
+    connectors:
+      - name: mock-source-test
+        config:
+          connector.class: org.apache.kafka.connect.tools.MockSourceConnector
+          tasks.max: 1
+          topic: mock-test-topic
+      - name: sample-jdbc-source
+        config:
+          connector.class: io.confluent.connect.jdbc.JdbcSourceConnector
+          tasks.max: 2
+          poll.interval.ms: 10000
+          connection.url: "jdbc:postgresql://db:5432/sample_db"
+          connection.user: "connect_user"
+          connection.password: "connect_password"
+          mode: timestamp
+          timestamp.column.name: updated_at
+          table.whitelist: "users,orders"
+          topic.prefix: "db-"
+          consumer.override.auto.offset.reset: earliest
+          value.converter: io.confluent.connect.avro.AvroConverter
+          value.converter.schema.registry.url: http://schema-registry:8081
+          errors.tolerance: all
+          schema.registry.url: http://schema-registry:8081
+      - name: sample-s3-sink
+        config:
+          connector.class: io.confluent.connect.s3.S3SinkConnector
+          tasks.max: 1
+          topics: "db-users,db-orders"
+          consumer.override.ssl.endpoint.identification.algorithm: ""
+          consumer.override.sasl.mechanism: AWS_MSK_IAM
+          consumer.override.sasl.kerberos.service.name: kafka
+          consumer.override.security.protocol: SASL_SSL
+          key.converter: org.apache.kafka.connect.storage.StringConverter
+          value.converter: io.confluent.connect.avro.AvroConverter
+          value.converter.schema.registry.url: http://schema-registry:8081
+          value.converter.basic.auth.credentials.source: USER_INFO
+          value.converter.basic.auth.user.info: "${file:/opt/confluent/secrets/schema-registry-basic-auth:username}:${file:/opt/confluent/secrets/schema-registry-basic-auth:password}"
+          flush.size: 1000
+          rotate.interval.ms: 300000
+          errors.tolerance: all
+          errors.deadletterqueue.topic.name: dlq-s3-sink
+          schema.registry.url: http://schema-registry:8081
+          config.providers: file
+          config.providers.file.class: org.apache.kafka.common.config.provider.FileConfigProvider
+      - name: backup-jdbc-source
+        config:
+          connector.class: io.confluent.connect.jdbc.JdbcSourceConnector
+          tasks.max: 1
+          poll.interval.ms: 30000
+          connection.url: "jdbc:postgresql://backup-db:5432/backup_db"
+          connection.user: "backup_user"
+          connection.password: "backup_password"
+          mode: incrementing
+          incrementing.column.name: id
+          topic.prefix: "backup-"
+          consumer.override.security.protocol: SASL_SSL
+          consumer.override.sasl.mechanism: SCRAM-SHA-256
+          consumer.override.sasl.kerberos.service.name: kafka
+          value.converter: io.confluent.connect.avro.AvroConverter
+          value.converter.schema.registry.url: http://schema-registry:8081
+          schema.registry.url: http://schema-registry:8081
+          errors.tolerance: all
+          errors.retry.timeout: 300000
+          errors.retry.delay.max.ms: 60000
